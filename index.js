@@ -402,6 +402,60 @@ class YouTubeAutomationAgent {
       });
     });
 
+    // Web OAuth for server installs (behind a reverse proxy): /auth/youtube starts Google's consent screen and
+    // /oauth2callback stores the tokens. The redirect URI is OAUTH_REDIRECT_URI, or this site's own address.
+    const oauthStates = new Map();
+    const redirectUriFor = req => process.env.OAUTH_REDIRECT_URI
+      || `${(req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim()}://${req.get('host')}/oauth2callback`;
+    const youtubeOAuthClient = async req => {
+      const credentials = new CredentialManager();
+      await credentials.initialize();
+      const youtube = credentials.credentials.youtube;
+      if (!youtube?.client_id || !youtube?.client_secret) return { credentials, client: null };
+      const { google } = require('googleapis');
+      return { credentials, client: new google.auth.OAuth2(youtube.client_id, youtube.client_secret, redirectUriFor(req)) };
+    };
+    this.app.get('/auth/youtube', async (req, res) => {
+      const { client } = await youtubeOAuthClient(req);
+      if (!client) {
+        return res.status(400).send('<h1>YouTube client is not configured</h1><p>Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET, then restart.</p>');
+      }
+      const state = require('crypto').randomBytes(16).toString('hex');
+      oauthStates.set(state, Date.now());
+      for (const [key, at] of oauthStates) if (Date.now() - at > 15 * 60 * 1000) oauthStates.delete(key);
+      res.redirect(client.generateAuthUrl({
+        access_type: 'offline',
+        prompt: 'consent',
+        state,
+        scope: [
+          'https://www.googleapis.com/auth/youtube.upload',
+          'https://www.googleapis.com/auth/youtube',
+          'https://www.googleapis.com/auth/youtube.readonly',
+          'https://www.googleapis.com/auth/yt-analytics.readonly',
+          'https://www.googleapis.com/auth/youtube.force-ssl'
+        ]
+      }));
+    });
+    this.app.get('/oauth2callback', async (req, res) => {
+      const { code, state, error } = req.query;
+      if (error) return res.status(400).send('<h1>Authorization was not granted</h1><p><a href="/auth/youtube">Try again</a></p>');
+      if (typeof state !== 'string' || !oauthStates.delete(state) || typeof code !== 'string') {
+        return res.status(400).send('<h1>Invalid or expired sign-in</h1><p><a href="/auth/youtube">Start again</a></p>');
+      }
+      try {
+        const { credentials, client } = await youtubeOAuthClient(req);
+        if (!client) return res.status(400).send('<h1>YouTube client is not configured</h1>');
+        const { tokens } = await client.getToken(code);
+        credentials.tokens.youtube = tokens;
+        await credentials.saveTokens();
+        this.logger.info('YouTube authorization saved');
+        res.send('<h1>YouTube connected</h1><p>Restart the app to leave setup mode and start the agents.</p><p><a href="/">Back to the dashboard</a></p>');
+      } catch (oauthError) {
+        this.logger.error('YouTube token exchange failed:', oauthError.message);
+        res.status(500).send('<h1>Token exchange failed</h1><p><a href="/auth/youtube">Try again</a></p>');
+      }
+    });
+
     // Manual content generation
     this.app.post('/generate', this.requireAPIKey(), async (req, res) => {
       try {

@@ -1,0 +1,10 @@
+node_modules
+.git
+.github
+.env
+.env.*
+data
+uploads
+logs
+config/credentials.json
+config/tokens.json
