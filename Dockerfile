@@ -17,8 +17,9 @@ RUN npm ci --omit=dev \
  && npm cache clean --force
 
 COPY . .
-RUN mkdir -p data uploads logs config \
- && chown node:node data uploads logs config
+# The app creates more folders under /app at run time (temp/processing, data/...): /app itself is the node user's.
+RUN mkdir -p data uploads logs config temp \
+ && chown node:node /app data uploads logs config temp
 
 USER node
 EXPOSE 3456
