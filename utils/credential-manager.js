@@ -40,6 +40,17 @@ class CredentialManager {
     } catch (error) {
       this.credentials = {};
     }
+    // Server installs (no interactive setup) pass the Google OAuth client through the environment.
+    const clientId = process.env.YOUTUBE_CLIENT_ID;
+    const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
+    if (clientId && clientSecret) {
+      this.credentials.youtube = {
+        ...(this.credentials.youtube || {}),
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uris: process.env.OAUTH_REDIRECT_URI ? [process.env.OAUTH_REDIRECT_URI] : (this.credentials.youtube?.redirect_uris || [])
+      };
+    }
   }
 
   async loadTokens() {

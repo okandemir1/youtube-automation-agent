@@ -1,0 +1,7 @@
+{
+  "port": 3456,
+  "saglik": "/health",
+  "dockerfile": "Dockerfile",
+  "kalici": ["data", "uploads", "logs", "config"],
+  "saatDilimi": "Europe/Istanbul"
+}

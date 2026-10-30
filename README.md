@@ -172,3 +172,12 @@ More from darkzOGx:
 - [open-sales-researcher](https://github.com/darkzOGx/open-sales-researcher): autonomous B2B company research. Works with Claude Code, Cursor, Copilot.
 - [darkzseo](https://github.com/darkzOGx/darkzseo): SEO tooling
 - [ConstructionBids.ai](https://constructionbids.ai): AI scans every federal, state & local public works bid and matches you to contracts you'll win.
+
+## Running on a server behind a reverse proxy
+
+The repo ships a `Dockerfile` (Node 22, FFmpeg, Playwright Chromium) and an `ajan-site.json` recipe for hosts that build and run it as a container.
+
+- Set `GEMINI_API_KEY` (or another provider key), `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET` in the environment.
+- Create the Google OAuth client as a **Web application** and add `https://<your-host>/oauth2callback` as an authorized redirect URI (override with `OAUTH_REDIRECT_URI` if needed).
+- Open `https://<your-host>/auth/youtube` once to connect the channel, then restart the app to leave setup mode.
+- `data/`, `uploads/`, `logs/` and `config/` (OAuth tokens) must be persistent volumes.
